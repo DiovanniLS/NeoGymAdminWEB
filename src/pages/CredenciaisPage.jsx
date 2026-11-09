@@ -24,53 +24,145 @@ function Badge({ status }) {
   return <span className={`badge ${b.cls}`}>{b.label}</span>
 }
 
+function DocumentoPreview({ credencialId, tipo, titulo }) {
+  const [imagemUrl, setImagemUrl] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState(false)
+
+  useEffect(() => {
+    let ativo = true
+    let urlTemporaria = null
+
+    async function carregarDocumento() {
+      try {
+        setLoading(true)
+        setErro(false)
+
+        const { data } = await api.get(
+          `/credenciais/${credencialId}/arquivo`,
+          {
+            params: { tipo },
+            responseType: 'blob',
+          }
+        )
+
+        if (!data || data.size === 0) {
+          throw new Error('Documento vazio.')
+        }
+
+        urlTemporaria = URL.createObjectURL(data)
+
+        if (ativo) {
+          setImagemUrl(urlTemporaria)
+        }
+      } catch (error) {
+        console.error(`Erro ao carregar ${titulo}:`, error)
+
+        if (ativo) {
+          setErro(true)
+        }
+      } finally {
+        if (ativo) {
+          setLoading(false)
+        }
+      }
+    }
+
+    carregarDocumento()
+
+    return () => {
+      ativo = false
+
+      if (urlTemporaria) {
+        URL.revokeObjectURL(urlTemporaria)
+      }
+    }
+  }, [credencialId, tipo, titulo])
+
+  return (
+    <section className="doc-section">
+      <h4>{titulo}</h4>
+
+      <div className="doc-preview">
+        {loading ? (
+          <p className="no-doc">Carregando documento...</p>
+        ) : erro ? (
+          <p className="no-doc">
+            Não foi possível carregar este documento.
+          </p>
+        ) : (
+          <img
+            src={imagemUrl}
+            alt={titulo}
+            className="doc-img"
+          />
+        )}
+      </div>
+
+      {!loading && !erro && imagemUrl && (
+        <a
+          href={imagemUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-secondary"
+        >
+          Abrir em nova aba
+        </a>
+      )}
+    </section>
+  )
+}
+
 function DocumentoModal({ credencial, onClose }) {
-  const isPdf = credencial.arquivoUrl?.endsWith('.pdf')
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Documento — {credencial.nomeUsuario}</h3>
-          <button className="btn-icon" onClick={onClose}>✕</button>
+          <h3>Documentos — {credencial.nomeUsuario}</h3>
+
+          <button className="btn-icon" onClick={onClose}>
+            ✕
+          </button>
         </div>
+
         <div className="modal-body">
           <div className="doc-meta">
-            <p><strong>Tipo:</strong> {credencial.tipo}</p>
-            <p><strong>E-mail:</strong> {credencial.emailUsuario}</p>
-            <p><strong>Enviado em:</strong> {fmtDate(credencial.criadoEm)}</p>
+            <p>
+              <strong>Tipo:</strong> {credencial.tipo}
+            </p>
+
+            <p>
+              <strong>E-mail:</strong> {credencial.emailUsuario}
+            </p>
+
+            <p>
+              <strong>Enviado em:</strong>{' '}
+              {fmtDate(credencial.criadoEm)}
+            </p>
+
             {credencial.observacaoAdmin && (
-              <p><strong>Observação:</strong> {credencial.observacaoAdmin}</p>
+              <p>
+                <strong>Observação:</strong>{' '}
+                {credencial.observacaoAdmin}
+              </p>
             )}
           </div>
-          <div className="doc-preview">
-            {credencial.arquivoUrl ? (
-              isPdf ? (
-                <iframe
-                  src={credencial.arquivoUrl}
-                  title="Documento"
-                  className="doc-iframe"
-                />
-              ) : (
-                <img
-                  src={credencial.arquivoUrl}
-                  alt="Documento"
-                  className="doc-img"
-                />
-              )
-            ) : (
-              <p className="no-doc">Nenhum documento enviado.</p>
-            )}
-          </div>
-          {credencial.arquivoUrl && (
-            <a
-              href={credencial.arquivoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-secondary"
-            >
-              Abrir em nova aba
-            </a>
-          )}
+
+          <DocumentoPreview
+            credencialId={credencial.id}
+            tipo="PROFISSIONAL"
+            titulo={
+              credencial.tipo === 'CRN'
+                ? 'Registro profissional (CRN)'
+                : 'Registro profissional (CREF)'
+            }
+          />
+
+          <DocumentoPreview
+            credencialId={credencial.id}
+            tipo="IDENTIDADE"
+            titulo="Documento de identidade (RG/CNH)"
+          />
         </div>
       </div>
     </div>

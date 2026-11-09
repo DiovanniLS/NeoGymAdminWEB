@@ -7,7 +7,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'https://neogym-production.up.railway.app',
+        target: 'http://192.168.20.75:8080',
         changeOrigin: true,
         secure: false,
       }
